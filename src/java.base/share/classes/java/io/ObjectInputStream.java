@@ -303,7 +303,11 @@ public class ObjectInputStream
             } else {
                 LUDCLEntry ludclEntry = stack.peek();
                 cl = com.ibm.oti.vm.VM.ludclSearchFromMarker(ludclEntry.stackMarker);
-                if (null == cl) {
+                // TODO these might be a better way to do this
+                // apparently the platform loader gets returned if nothing else
+                // is found, but nothing is found because we stop searching at 
+                // the stack marker
+                if (null == cl || cl == ClassLoader.getPlatformClassLoader()) {
                     cl = ludclEntry.ludcl;
                 }
             }

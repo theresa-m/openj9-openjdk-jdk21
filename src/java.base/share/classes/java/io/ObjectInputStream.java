@@ -299,14 +299,20 @@ public class ObjectInputStream
             Stack<LUDCLEntry> stack = tl_stack.get();
             ClassLoader cl;
             if (stack.empty()) {
+                // TODO is our implementation for this wrong? it seems capable 
+                // of returning the platform classloader at any time
+                // there are two different ludcl iterators in sunvmi and orbvmhelpers 
+                // that have two different behaviors. should look into this
+                // see https://github.com/eclipse-openj9/openj9/pull/818
+                // there was also a more recent change from peter to ignore Java 8
+                // platform loader
                 cl = jdk.internal.misc.VM.latestUserDefinedLoader();
             } else {
                 LUDCLEntry ludclEntry = stack.peek();
                 cl = com.ibm.oti.vm.VM.ludclSearchFromMarker(ludclEntry.stackMarker);
-                // TODO these might be a better way to do this
-                // apparently the platform loader gets returned if nothing else
-                // is found, but nothing is found because we stop searching at 
-                // the stack marker
+                // jdk.internal.misc.VM.latestUserDefinedLoader() returns the 
+                // platform classloader only if no other loader can be found.
+                // In that case use the last cached ludcl.
                 if (null == cl || cl == ClassLoader.getPlatformClassLoader()) {
                     cl = ludclEntry.ludcl;
                 }

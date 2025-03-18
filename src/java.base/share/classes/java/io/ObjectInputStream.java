@@ -278,16 +278,42 @@ public class ObjectInputStream
             }
         };
 
-        public static void push() {
-            push(lookup());
+        // public static void push() {
+        //     push(lookup());
+        // }
+
+        // // TODO instead of pushing and popping
+        // // each time only push if the classloader is new
+        // // to avoid extra calls to getStackMarker
+        // public static void push(ClassLoader cl) {
+        //     Stack<LUDCLEntry> stack = tl_stack.get();
+        //     LUDCLEntry entry = new LUDCLEntry();
+        //     entry.ludcl = cl;
+        //     entry.stackMarker = com.ibm.oti.vm.VM.getStackMarker();
+        //     stack.push(entry);
+        // }
+
+        public static boolean push() {
+            boolean result = push(lookup());
+            if (result == false) {
+                /* update stack marker */
+                Stack<LUDCLEntry> stack = tl_stack.get();
+                stack.peek().stackMarker = com.ibm.oti.vm.VM.getStackMarker();
+            }
+            return result;
         }
 
-        public static void push(ClassLoader cl) {
+        public static boolean push(ClassLoader cl) {
             Stack<LUDCLEntry> stack = tl_stack.get();
-            LUDCLEntry entry = new LUDCLEntry();
-            entry.ludcl = cl;
-            entry.stackMarker = com.ibm.oti.vm.VM.getStackMarker();
-            stack.push(entry);
+            if (!stack.isEmpty() && (stack.peek().ludcl == cl)) {
+                return false; /* don't refresh in the case where cl is passed from jit */
+            } else {
+                LUDCLEntry entry = new LUDCLEntry();
+                entry.ludcl = cl;
+                entry.stackMarker = com.ibm.oti.vm.VM.getStackMarker();
+                stack.push(entry);
+                return true;
+            }
         }
 
         public static void pop() {
@@ -652,12 +678,13 @@ public class ObjectInputStream
         if ((null == curContext) && isClassCachingEnabled) {
             // If caller is not provided, follow the standard path to get the cachedLudcl.
             // Otherwise use the class loader provided by JIT as the cachedLudcl.
+
+            // my assumption would be that jit case happens the most often
             if (caller == null) {
-                LUDCLHelper.push();
+                setCached = LUDCLHelper.push();
             } else {
-                LUDCLHelper.push(caller.getClassLoader());
+                setCached = LUDCLHelper.push(caller.getClassLoader());
             }
-            setCached = true;
         }
 
         // if nested read, passHandle contains handle of enclosing object
@@ -760,8 +787,7 @@ public class ObjectInputStream
     public Object readUnshared() throws IOException, ClassNotFoundException {
         boolean setCached = false;
         if ((null == curContext) && isClassCachingEnabled) {
-            LUDCLHelper.push();
-            setCached = true;
+            setCached = LUDCLHelper.push();
         }
 
         // if nested read, passHandle contains handle of enclosing object
